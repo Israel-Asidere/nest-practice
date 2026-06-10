@@ -1,47 +1,64 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post as PostDecorator, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post as PostDecorator,
+  Put,
+  Query,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import { PostsService } from './posts.service';
-import type { Post as PostInterface} from './interfaces/post.interface'
+import type { Post as PostInterface } from './interfaces/post.interface';
+import { CreatePostDto } from './dto/create-post.dto';
+import { PostExistsPipe } from './pipes/post-exists-pipe';
+import { Post as PostEntity } from './entities/post.entity';
 
 @Controller('posts')
 export class PostsController {
-    constructor (private readonly postsService: PostsService){}
+  constructor(private readonly postsService: PostsService) {}
 
-    @Get()
-    findAll(@Query('search') search? : string) : PostInterface[]{
-        const extractAllPosts = this.postsService.findAll()
+  @Get()
+  async findAll(): Promise<PostEntity[]> {
+    return this.postsService.findAll();
+  }
+  @Get(':id')
+  async findOne(
+    @Param('id', ParseIntPipe, PostExistsPipe) id: number,
+  ): Promise<PostEntity> {
+    return this.postsService.findOne(id);
+  }
 
-        if(search){
-            return extractAllPosts.filter((singlePost) =>
-                singlePost.title.toLowerCase().includes(search.toLowerCase()),
-            ); 
-        }
-        return extractAllPosts;
-    }
+  @PostDecorator('create')
+  @HttpCode(HttpStatus.CREATED)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
+  async create(@Body() createPostData: CreatePostDto): Promise<PostEntity> {
+    return this.postsService.create(createPostData);
+  }
 
-    @Get(':id')
-    findOne(@Param('id', ParseIntPipe) id: number) : PostInterface{
-        return this.postsService.findOne(id)
-    }
+  @Put(':id')
+  async update(
+    @Param('id', ParseIntPipe, PostExistsPipe) id: number,
+    @Body() updatePostData: Partial<Omit<PostInterface, 'id' | 'createdAt'>>,
+  ): Promise<PostEntity> {
+    return this.postsService.update(id, updatePostData);
+  }
 
-    @PostDecorator('create')
-    @HttpCode(HttpStatus.CREATED)
-    create(
-        @Body() createPostData: Omit<PostInterface, 'id' | 'createdAt' >,
-    ) : PostInterface{
-        return this.postsService.create(createPostData);
-    }
-    @Put(':id')
-    update(@Param('id', ParseIntPipe) id:number,
-    @Body() updatePostData: Partial<Omit<PostInterface, 'id' |'createdAt'>>)
-    :PostInterface{
-        return this.postsService.update(id, updatePostData)
-    }
-
-    @Delete(':id')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    remove(@Param('id',  ParseIntPipe)id:number) : void{
-        this.postsService.remove(id)
-    }
-    
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @Param('id', ParseIntPipe, PostExistsPipe) id: number,
+  ): Promise<void> {
+    this.postsService.remove(id);
+  }
 }
-
